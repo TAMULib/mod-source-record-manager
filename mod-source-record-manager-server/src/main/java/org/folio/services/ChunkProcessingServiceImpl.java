@@ -47,9 +47,9 @@ public class ChunkProcessingServiceImpl implements ChunkProcessingService {
       .withChunkSize(incomingChunk.getInitialRecords().size())
       .withCreatedDate(new Date());
     jobExecutionSourceChunkDao.save(sourceChunk, params.getTenantId())
-      .compose(ar -> checkAndUpdateJobExecutionStatusIfNecessary(jobExecutionId, new StatusDto().withStatus(StatusDto.Status.PARSING_IN_PROGRESS), params))
-      .compose(jobExecution -> updateJobExecutionProgress(jobExecutionId, incomingChunk, params))
-      .compose(jobExecution -> changeEngineService.parseRawRecordsChunkForJobExecution(incomingChunk, jobExecution, sourceChunk.getId(), params))
+      .compose(job -> updateJobExecutionProgress(jobExecutionId, incomingChunk, params))
+      .compose(s -> checkAndUpdateJobExecutionStatusIfNecessary(jobExecutionId, new StatusDto().withStatus(StatusDto.Status.PARSING_IN_PROGRESS), params))
+      .compose(jobExec -> changeEngineService.parseRawRecordsChunkForJobExecution(incomingChunk, jobExec, sourceChunk.getId(), params))
       .compose(records -> instanceProcessingService.process(records, sourceChunk.getId(), params))
       .setHandler(chunkProcessAr -> updateJobExecutionStatusIfAllChunksProcessed(jobExecutionId, params)
         .setHandler(jobUpdateAr -> future.handle(chunkProcessAr.map(true))));
