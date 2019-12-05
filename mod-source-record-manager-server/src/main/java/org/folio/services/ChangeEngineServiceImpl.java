@@ -33,6 +33,7 @@ import org.folio.services.parsers.RecordParser;
 import org.folio.services.parsers.RecordParserBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import javax.ws.rs.NotFoundException;
 import java.util.ArrayList;
@@ -122,13 +123,15 @@ public class ChangeEngineServiceImpl implements ChangeEngineService {
     return rawRecords.stream()
       .map(rawRecord -> {
         ParsedResult parsedResult = parser.parseRecord(rawRecord.getRecord());
+        String instanceId = rawRecord.getInstanceId();
+        String sourceRecordId = rawRecord.getSourceRecordId();
         Record record = new Record()
-          .withId(UUID.randomUUID().toString())
+          .withId(StringUtils.isEmpty(instanceId)?UUID.randomUUID().toString():instanceId)
           .withMatchedId(getMatchedIdFromParsedResult(parsedResult))
           .withRecordType(Record.RecordType.valueOf(jobExecution.getJobProfileInfo().getDataType().value()))
           .withSnapshotId(jobExecution.getId())
           .withOrder(rawRecord.getOrder())
-          .withRawRecord(new RawRecord().withId(UUID.randomUUID().toString()).withContent(rawRecord.getRecord()));
+          .withRawRecord(new RawRecord().withId(StringUtils.isEmpty(sourceRecordId)?UUID.randomUUID().toString():sourceRecordId).withContent(rawRecord.getRecord()));
         if (parsedResult.isHasError()) {
           record.setErrorRecord(new ErrorRecord()
             .withId(UUID.randomUUID().toString())
