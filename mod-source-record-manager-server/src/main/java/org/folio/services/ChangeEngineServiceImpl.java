@@ -132,12 +132,8 @@ public class ChangeEngineServiceImpl implements ChangeEngineService {
           .withRecordType(Record.RecordType.valueOf(jobExecution.getJobProfileInfo().getDataType().value()))
           .withSnapshotId(jobExecution.getId())
           .withOrder(rawRecord.getOrder())
+          .withAdditionalInfo(new AdditionalInfo().withSuppressDiscovery(rawRecord.getSuppressDiscovery()))
           .withRawRecord(new RawRecord().withId(StringUtils.isEmpty(sourceRecordId)?UUID.randomUUID().toString():sourceRecordId).withContent(rawRecord.getRecord()));
-          if(rawRecord.getSuppressInOpac()) {
-            AdditionalInfo additionalInfo = new AdditionalInfo();
-            additionalInfo.setSuppressDiscovery(true);
-            record = record.withAdditionalInfo(additionalInfo);
-          }
         if (parsedResult.isHasError()) {
           record.setErrorRecord(new ErrorRecord()
             .withId(UUID.randomUUID().toString())
