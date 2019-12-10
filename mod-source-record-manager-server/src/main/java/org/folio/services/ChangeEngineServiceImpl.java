@@ -14,6 +14,7 @@ import org.folio.dao.JobExecutionSourceChunkDao;
 import org.folio.dataimport.util.OkapiConnectionParams;
 import org.folio.dataimport.util.Try;
 import org.folio.rest.client.SourceStorageBatchClient;
+import org.folio.rest.jaxrs.model.AdditionalInfo;
 import org.folio.rest.jaxrs.model.ErrorRecord;
 import org.folio.rest.jaxrs.model.InitialRecord;
 import org.folio.rest.jaxrs.model.JobExecution;
@@ -132,6 +133,11 @@ public class ChangeEngineServiceImpl implements ChangeEngineService {
           .withSnapshotId(jobExecution.getId())
           .withOrder(rawRecord.getOrder())
           .withRawRecord(new RawRecord().withId(StringUtils.isEmpty(sourceRecordId)?UUID.randomUUID().toString():sourceRecordId).withContent(rawRecord.getRecord()));
+          if(rawRecord.getSuppressInOpac()) {
+            AdditionalInfo additionalInfo = new AdditionalInfo();
+            additionalInfo.setSuppressDiscovery(true);
+            record = record.withAdditionalInfo(additionalInfo);
+          }
         if (parsedResult.isHasError()) {
           record.setErrorRecord(new ErrorRecord()
             .withId(UUID.randomUUID().toString())
