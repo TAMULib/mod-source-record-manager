@@ -1275,7 +1275,7 @@ public class ChangeManagerAPITest extends AbstractRestTest {
         .withLast(false)
         .withCounter(15)
         .withContentType(RecordsMetadata.ContentType.MARC_RAW))
-      .withInitialRecords(asList(CORRECT_INITIAL_RECORD_1, CORRECT_INITIAL_RECORD_1)
+      .withInitialRecords(asList(CORRECT_INITIAL_RECORD_1, CORRECT_INITIAL_RECORD_2)
       );
     Async async = testContext.async();
     InitJobExecutionsRsDto response = constructAndPostInitJobExecutionRqDto(1);
