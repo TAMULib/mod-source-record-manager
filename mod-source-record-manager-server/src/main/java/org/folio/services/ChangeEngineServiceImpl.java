@@ -1,9 +1,18 @@
 package org.folio.services;
 
-import io.vertx.core.Future;
-import io.vertx.core.http.HttpClientResponse;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
+import static java.lang.String.format;
+import static org.folio.HttpStatus.HTTP_CREATED;
+import static org.folio.rest.RestVerticle.MODULE_SPECIFIC_ARGS;
+import static org.folio.services.afterprocessing.AdditionalFieldsUtil.TAG_999;
+import static org.folio.services.afterprocessing.AdditionalFieldsUtil.addFieldToMarcRecord;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import javax.ws.rs.NotFoundException;
+
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.folio.HttpStatus;
@@ -12,6 +21,7 @@ import org.folio.dataimport.util.OkapiConnectionParams;
 import org.folio.dataimport.util.Try;
 import org.folio.rest.client.SourceStorageBatchClient;
 import org.folio.rest.jaxrs.model.ErrorRecord;
+import org.folio.rest.jaxrs.model.InitialRecord;
 import org.folio.rest.jaxrs.model.JobExecution;
 import org.folio.rest.jaxrs.model.JobExecutionSourceChunk;
 import org.folio.rest.jaxrs.model.ParsedRecord;
@@ -28,17 +38,10 @@ import org.folio.services.parsers.RecordParserBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import javax.ws.rs.NotFoundException;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
-import static java.lang.String.format;
-import static org.folio.HttpStatus.HTTP_CREATED;
-import static org.folio.rest.RestVerticle.MODULE_SPECIFIC_ARGS;
-import static org.folio.services.afterprocessing.AdditionalFieldsUtil.TAG_999;
-import static org.folio.services.afterprocessing.AdditionalFieldsUtil.addFieldToMarcRecord;
+import io.vertx.core.Future;
+import io.vertx.core.http.HttpClientResponse;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 
 @Service
 public class ChangeEngineServiceImpl implements ChangeEngineService {
@@ -61,7 +64,7 @@ public class ChangeEngineServiceImpl implements ChangeEngineService {
   @Override
   public Future<List<Record>> parseRawRecordsChunkForJobExecution(RawRecordsDto chunk, JobExecution jobExecution, String sourceChunkId, OkapiConnectionParams params) {
     Future<List<Record>> future = Future.future();
-    List<Record> parsedRecords = parseRecords(chunk.getRecords(), chunk.getRecordsMetadata().getContentType(), jobExecution, sourceChunkId, params.getTenantId());
+    List<Record> parsedRecords = parseRecords(chunk.getInitialRecords(), chunk.getRecordsMetadata().getContentType(), jobExecution, sourceChunkId, params.getTenantId());
     fillParsedRecordsWithAdditionalFields(parsedRecords);
     postRecords(params, jobExecution, parsedRecords)
       .setHandler(postAr -> {
@@ -97,20 +100,24 @@ public class ChangeEngineServiceImpl implements ChangeEngineService {
    * @param tenantId      - tenant id
    * @return - list of records with parsed or error data
    */
-  private List<Record> parseRecords(List<String> rawRecords, RecordsMetadata.ContentType recordContentType, JobExecution jobExecution, String sourceChunkId, String tenantId) {
-    if (CollectionUtils.isEmpty(rawRecords)) {
+  private List<Record> parseRecords(List<InitialRecord> initialRecords, RecordsMetadata.ContentType recordContentType, JobExecution jobExecution, String sourceChunkId, String tenantId) {
+    if (CollectionUtils.isEmpty(initialRecords)) {
       return Collections.emptyList();
     }
     RecordParser parser = RecordParserBuilder.buildParser(recordContentType);
     MutableInt counter = new MutableInt();
     // if number of records is more than THRESHOLD_CHUNK_SIZE update the progress every 20% of processed records,
     // otherwise update it once after all the records are processed
-    int partition = rawRecords.size() > THRESHOLD_CHUNK_SIZE ? rawRecords.size() / 5 : rawRecords.size();
-    return rawRecords.stream()
-      .map(rawRecord -> {
+    int partition = initialRecords.size() > THRESHOLD_CHUNK_SIZE ? initialRecords.size() / 5 : initialRecords.size();
+    return initialRecords.stream()
+      .map(initialRecord -> {
+        String rawRecord = initialRecord.getRecord();
+        String sourceRecordId = initialRecord.getSourceRecordId();
+        String instanceId = initialRecord.getInstanceId();
         ParsedResult parsedResult = parser.parseRecord(rawRecord);
         Record record = new Record()
-          .withId(UUID.randomUUID().toString())
+          .withId(sourceRecordId)
+          .withInstanceId(instanceId)
           .withMatchedId(getMatchedIdFromParsedResult(parsedResult))
           .withRecordType(Record.RecordType.valueOf(jobExecution.getJobProfileInfo().getDataType().value()))
           .withSnapshotId(jobExecution.getId())
@@ -127,7 +134,7 @@ public class ChangeEngineServiceImpl implements ChangeEngineService {
       })
       .peek(stat -> { //NOSONAR
         if (counter.incrementAndGet() % partition == 0) {
-          LOGGER.info("Parsed {} records out of {}", counter.intValue(), rawRecords.size());
+          LOGGER.info("Parsed {} records out of {}", counter.intValue(), initialRecords.size());
           jobExecutionSourceChunkDao.getById(sourceChunkId, tenantId)
             .compose(optional -> optional
               .map(sourceChunk -> jobExecutionSourceChunkDao.update(sourceChunk.withProcessedAmount(sourceChunk.getProcessedAmount() + counter.intValue()), tenantId))

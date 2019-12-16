@@ -283,7 +283,6 @@ public class Processor {
         createNewComplexObj = false;
       }
     }
-    instance.setId(UUID.randomUUID().toString());
   }
 
   private void handleSubFields(RuleExecutionContext ruleExecutionContext, List<Subfield> subFields, int subFieldsIndex, Set<String> subFieldsSet,

@@ -173,7 +173,7 @@ public class InstanceProcessingServiceImpl implements AfterProcessingService {
       if (record.getParsedRecord() != null && record.getParsedRecord().getContent() != null) {
         JsonObject parsedRecordContent = new JsonObject(record.getParsedRecord().getContent().toString());
         Instance instance = mapper.mapRecord(parsedRecordContent, mappingParameters);
-        return Pair.of(instance, record);
+        return Pair.of(instance.withId(record.getInstanceId()), record);
       }
     } catch (Exception e) {
       LOGGER.error("Error mapping Record to Instance", e);

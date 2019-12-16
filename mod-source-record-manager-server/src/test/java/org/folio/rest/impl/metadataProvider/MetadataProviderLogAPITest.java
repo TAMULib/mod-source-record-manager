@@ -1,29 +1,5 @@
 package org.folio.rest.impl.metadataProvider;
 
-import com.github.tomakehurst.wiremock.client.WireMock;
-import io.restassured.RestAssured;
-import io.restassured.response.Response;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.unit.junit.VertxUnitRunner;
-import org.apache.http.HttpStatus;
-import org.folio.rest.impl.AbstractRestTest;
-import org.folio.rest.jaxrs.model.JobExecution;
-import org.folio.rest.jaxrs.model.JobProfileInfo;
-import org.folio.rest.jaxrs.model.LogCollectionDto;
-import org.folio.rest.jaxrs.model.LogDto;
-import org.folio.rest.jaxrs.model.RawRecordsDto;
-import org.folio.rest.jaxrs.model.RecordsMetadata;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
 import static com.github.tomakehurst.wiremock.client.WireMock.created;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static org.folio.rest.jaxrs.model.JobExecution.Status.COMMITTED;
@@ -34,6 +10,33 @@ import static org.folio.rest.jaxrs.model.JobProfileInfo.DataType.MARC;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.is;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.apache.http.HttpStatus;
+import org.folio.rest.impl.AbstractRestTest;
+import org.folio.rest.jaxrs.model.InitialRecord;
+import org.folio.rest.jaxrs.model.JobExecution;
+import org.folio.rest.jaxrs.model.JobProfileInfo;
+import org.folio.rest.jaxrs.model.LogCollectionDto;
+import org.folio.rest.jaxrs.model.LogDto;
+import org.folio.rest.jaxrs.model.RawRecordsDto;
+import org.folio.rest.jaxrs.model.RecordsMetadata;
+import org.junit.Assert;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
+import com.github.tomakehurst.wiremock.client.WireMock;
+
+import io.restassured.RestAssured;
+import io.restassured.response.Response;
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.unit.junit.VertxUnitRunner;
 
 /**
  * REST tests for MetadataProvider to manager Log entities
@@ -46,7 +49,20 @@ public class MetadataProviderLogAPITest extends AbstractRestTest {
   private static final String PUT_JOB_EXECUTIONS_PATH = "/change-manager/jobExecutions/";
   private static final String PROFILE_NAME = "Parse Marc files profile";
   private static final int LANDING_PAGE_LOGS_LIMIT = 25;
+  
   private static final String RAW_RECORD = "01240cas a2200397   450000100070000000500170000700800410002401000170006502200140008203500260009603500220012203500110014403500190015504000440017405000150021808200110023322200420024424500430028626000470032926500380037630000150041431000220042932100250045136200230047657000290049965000330052865000450056165500420060670000450064885300180069386300230071190200160073490500210075094800370077195000340080836683220141106221425.0750907c19509999enkqr p       0   a0eng d  a   58020553   a0022-0469  a(CStRLIN)NYCX1604275S  a(NIC)notisABP6388  a366832  a(OCoLC)1604275  dCtYdMBTIdCtYdMBTIdNICdCStRLINdNIC0 aBR140b.J6  a270.0504aThe Journal of ecclesiastical history04aThe Journal of ecclesiastical history.  aLondon,bCambridge University Press [etc.]  a32 East 57th St., New York, 10022  av.b25 cm.  aQuarterly,b1970-  aSemiannual,b1950-690 av. 1-   Apr. 1950-  aEditor:   C. W. Dugmore. 0aChurch historyxPeriodicals. 7aChurch history2fast0(OCoLC)fst00860740 7aPeriodicals2fast0(OCoLC)fst014116411 aDugmore, C. W.q(Clifford William),eed.0381av.i(year)4081a1-49i1950-1998  apfndbLintz  a19890510120000.02 a20141106bmdbatcheltsxaddfast  lOLINaBR140b.J86h01/01/01 N01542ccm a2200361   ";
+  private static final String SOURCE_RECORD_ID = UUID.randomUUID().toString();
+  private static final String INSTANCE_ID = UUID.randomUUID().toString();
+  private static final boolean SUPPRESS_DISCOVERY = false;
+
+  private static final InitialRecord INITIAL_RECORD = new InitialRecord();
+
+  static {
+	  INITIAL_RECORD.setRecord(RAW_RECORD);
+	  INITIAL_RECORD.setSourceRecordId(SOURCE_RECORD_ID);
+	  INITIAL_RECORD.setInstanceId(INSTANCE_ID);
+	  INITIAL_RECORD.setSuppressDiscovery(SUPPRESS_DISCOVERY);
+  }
 
   @Test
   public void shouldReturnEmptyListOnGetIfNoLogsExist() {
@@ -361,7 +377,7 @@ public class MetadataProviderLogAPITest extends AbstractRestTest {
         .withCounter(1)
         .withTotal(expectedTotalRecords)
         .withContentType(RecordsMetadata.ContentType.MARC_RAW))
-      .withRecords(Collections.singletonList(RAW_RECORD));
+      .withInitialRecords(Collections.singletonList(INITIAL_RECORD));
 
     List<JobExecution> createdJobExecutions = constructAndPostInitJobExecutionRqDto(2).getJobExecutions();
     JobExecution jobExecution = createdJobExecutions.get(0);
@@ -415,7 +431,7 @@ public class MetadataProviderLogAPITest extends AbstractRestTest {
     }
 
     RawRecordsDto rawRecordsDto = new RawRecordsDto()
-      .withRecords(Collections.singletonList(RAW_RECORD));
+      .withInitialRecords(Collections.singletonList(INITIAL_RECORD));
 
     RecordsMetadata recordsMetadata = new RecordsMetadata()
       .withLast(true)
